@@ -1,0 +1,17 @@
+package routes
+
+import (
+	"github.com/gin-gonic/gin"
+	"r3sec/controllers"
+)
+
+func AuthRoutes(r *gin.Engine) {
+	auth := r.Group("/auth")
+	{
+		auth.POST("/register", controllers.Register)
+		auth.GET("/verify-email", controllers.VerifyEmail)
+		auth.POST("/resend-verification", controllers.ResendVerification)
+		auth.POST("/login", controllers.Login)
+		auth.POST("/google", controllers.GoogleLogin)
+	}
+}
