@@ -5,7 +5,7 @@ import (
 	"r3sec/controllers"
 )
 
-func AuthRoutes(r *gin.Engine) {
+func AuthRoutes(r *gin.RouterGroup) {
 	auth := r.Group("/auth")
 	{
 		auth.POST("/register", controllers.Register)

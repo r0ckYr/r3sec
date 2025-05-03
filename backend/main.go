@@ -23,18 +23,17 @@ func main() {
 
 	r := gin.Default()
 
-	// 🔓 Setup CORS
 	corsOrigin := os.Getenv("CORS_ORIGIN")
 	if corsOrigin == "" {
-		corsOrigin = "*" // fallback
+		corsOrigin = "*"
 	}
 
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{corsOrigin},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
+		AllowCredentials: false,
 		MaxAge:           12 * time.Hour,
 	}))
 
@@ -44,7 +43,6 @@ func main() {
 	if port == "" {
 		port = "5000"
 	}
-	log.Printf("🚀 Server running at http://localhost:%s", port)
+	log.Printf("Server running at http://localhost:%s", port)
 	r.Run(":" + port)
 }
-

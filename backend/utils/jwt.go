@@ -13,7 +13,7 @@ func GenerateEmailToken(userID string, email string) (string, error) {
     claims := jwt.MapClaims{
         "id":    userID,
         "email": email,
-        "exp":   time.Now().Add(24 * time.Hour).Unix(),
+        "exp": time.Now().Add(10 * time.Minute).Unix(),
     }
     token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
     return token.SignedString(jwtSecret)

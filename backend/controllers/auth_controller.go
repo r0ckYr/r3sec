@@ -47,11 +47,12 @@ func Register(c *gin.Context) {
 
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(req.Password), 10)
 	newUser := models.User{
-		Email:        email,
-		PasswordHash: string(hashedPassword),
-		IsVerified:   false,
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
+		Email:                     email,
+		PasswordHash:              string(hashedPassword),
+		EmailNotificationsEnabled: true,
+		IsVerified:                false,
+		CreatedAt:                 time.Now(),
+		UpdatedAt:                 time.Now(),
 	}
 	res, err := userColl.InsertOne(context.TODO(), newUser)
 	if err != nil {
@@ -154,8 +155,23 @@ func Login(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid credentials"})
 		return
 	}
+
 	token, _ := utils.GenerateJWT(user.ID.Hex(), user.Email)
-	c.JSON(http.StatusOK, gin.H{"message": "Login successful", "token": token})
+
+	userResponse := gin.H{
+		"id":          user.ID.Hex(),
+		"email":       user.Email,
+		"is_verified": user.IsVerified,
+		"is_deleted":  user.IsDeleted,
+		"created_at":  user.CreatedAt,
+		"updated_at":  user.UpdatedAt,
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Login successful",
+		"token":   token,
+		"user":    userResponse,
+	})
 }
 
 func GoogleLogin(c *gin.Context) {
@@ -181,14 +197,35 @@ func GoogleLogin(c *gin.Context) {
 		rand.Read(randomBytes)
 		hash, _ := bcrypt.GenerateFromPassword(randomBytes, 10)
 		user = models.User{
-			Email:        email,
-			PasswordHash: string(hash),
-			IsVerified:   true,
-			CreatedAt:    time.Now(),
-			UpdatedAt:    time.Now(),
+			Email:                     email,
+			PasswordHash:              string(hash),
+			EmailNotificationsEnabled: true,
+			IsVerified:                true,
+			CreatedAt:                 time.Now(),
+			UpdatedAt:                 time.Now(),
 		}
-		userColl.InsertOne(context.TODO(), user)
+		res, insertErr := userColl.InsertOne(context.TODO(), user)
+		if insertErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
+			return
+		}
+		user.ID = res.InsertedID.(primitive.ObjectID)
 	}
+
 	token, _ := utils.GenerateJWT(user.ID.Hex(), user.Email)
-	c.JSON(http.StatusOK, gin.H{"message": "Google login successful", "token": token})
+
+	userResponse := gin.H{
+		"id":          user.ID.Hex(),
+		"email":       user.Email,
+		"is_verified": user.IsVerified,
+		"is_deleted":  user.IsDeleted,
+		"created_at":  user.CreatedAt,
+		"updated_at":  user.UpdatedAt,
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Google login successful",
+		"token":   token,
+		"user":    userResponse,
+	})
 }
