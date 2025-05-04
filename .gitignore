@@ -74,4 +74,6 @@ frontend/package-lock.json
 frontend/yarn.lock
 frontend/.env.local
 frontend/.env.*.local
+frontend/.vercel/
+frontend/.vercel
 

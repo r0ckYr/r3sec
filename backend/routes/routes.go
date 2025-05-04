@@ -11,5 +11,6 @@ func SetupRoutes(r *gin.Engine) {
 		api.GET("/ping", controllers.Ping)
 		AuthRoutes(api)
 		UserRoutes(api)
+        ContractRoutes(api)
 	}
 }

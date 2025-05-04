@@ -1,0 +1,262 @@
+package controllers
+
+import (
+	"context"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo/options"
+
+	"r3sec/config"
+	"r3sec/models"
+)
+
+func ListContracts(c *gin.Context) {
+	user := c.MustGet("currentUser").(models.User)
+
+	contractsColl := config.DB.Collection("contracts")
+
+	findOptions := options.Find()
+	findOptions.SetSort(bson.M{"created_at": -1})
+
+	cursor, err := contractsColl.Find(
+		context.TODO(),
+		bson.M{
+			"user_id":    user.ID.Hex(),
+			"is_deleted": false,
+		},
+		findOptions,
+	)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve contracts"})
+		return
+	}
+	defer cursor.Close(context.TODO())
+
+	var contracts []models.Contract
+	if err = cursor.All(context.TODO(), &contracts); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode contracts"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"contracts": contracts})
+}
+
+func CreateContract(c *gin.Context) {
+	user := c.MustGet("currentUser").(models.User)
+
+	var req struct {
+		Name        string `json:"name" binding:"required"`
+		UploadType  string `json:"upload_type" binding:"required"`
+		Description string `json:"description"`
+		UploadURL   string `json:"upload_url" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data"})
+		return
+	}
+
+	if !isValidUploadType(req.UploadType) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid upload type"})
+		return
+	}
+
+	if !validateUploadURL(req.UploadType, req.UploadURL) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid URL or contract address format"})
+		return
+	}
+
+	contract := models.Contract{
+		UserID:      user.ID.Hex(),
+		Name:        req.Name,
+		Description: req.Description,
+		UploadType:  req.UploadType,
+		UploadURL:   req.UploadURL,
+		Status:      "pending",
+		IsDeleted:   false,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+
+	contractsColl := config.DB.Collection("contracts")
+	result, err := contractsColl.InsertOne(context.TODO(), contract)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create contract"})
+		return
+	}
+
+	if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
+		contract.ID = oid.Hex()
+	}
+
+	logContract(user.ID.Hex(), contract.ID, "Uploaded", "user")
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message":  "Contract created successfully",
+		"contract": contract,
+	})
+}
+
+func GetContract(c *gin.Context) {
+	user := c.MustGet("currentUser").(models.User)
+	contractID := c.Param("id")
+
+	objID, err := primitive.ObjectIDFromHex(contractID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid contract ID format"})
+		return
+	}
+
+	var contract models.Contract
+	contractsColl := config.DB.Collection("contracts")
+	err = contractsColl.FindOne(
+		context.TODO(),
+		bson.M{
+			"_id":        objID,
+			"user_id":    user.ID.Hex(),
+			"is_deleted": false,
+		},
+	).Decode(&contract)
+
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Contract not found"})
+		return
+	}
+
+	var auditReport models.AuditReport
+	reportsColl := config.DB.Collection("audit_reports")
+	err = reportsColl.FindOne(
+		context.TODO(),
+		bson.M{"contract_id": contract.ID},
+	).Decode(&auditReport)
+
+	if err == nil {
+		findingsColl := config.DB.Collection("findings")
+		findingsCursor, err := findingsColl.Find(
+			context.TODO(),
+			bson.M{"report_id": auditReport.ID},
+		)
+
+		var findings []models.Finding
+		if err == nil {
+			defer findingsCursor.Close(context.TODO())
+			findingsCursor.All(context.TODO(), &findings)
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"contract":     contract,
+			"audit_report": auditReport,
+			"findings":     findings,
+		})
+	} else {
+		c.JSON(http.StatusOK, gin.H{
+			"contract": contract,
+		})
+	}
+}
+
+func DeleteContract(c *gin.Context) {
+	user := c.MustGet("currentUser").(models.User)
+	contractID := c.Param("id")
+
+	objID, err := primitive.ObjectIDFromHex(contractID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid contract ID format"})
+		return
+	}
+
+	contractsColl := config.DB.Collection("contracts")
+	var contract models.Contract
+	err = contractsColl.FindOne(
+		context.TODO(),
+		bson.M{
+			"_id":        objID,
+			"user_id":    user.ID.Hex(),
+			"is_deleted": false,
+		},
+	).Decode(&contract)
+
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Contract not found"})
+		return
+	}
+
+	_, err = contractsColl.UpdateOne(
+		context.TODO(),
+		bson.M{"_id": objID},
+		bson.M{
+			"$set": bson.M{
+				"is_deleted": true,
+				"updated_at": time.Now(),
+			},
+		},
+	)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete contract"})
+		return
+	}
+
+	logContract(user.ID.Hex(), contract.ID, "Deleted", "user")
+
+	c.JSON(http.StatusOK, gin.H{"message": "Contract deleted successfully"})
+}
+
+// isValidUploadType checks if the upload type is valid
+func isValidUploadType(uploadType string) bool {
+	validTypes := map[string]bool{
+		"github":       true,
+		"program_id":   true,
+		"google_drive": true,
+		"gitlab":       true,
+		"bitbucket":    true,
+		"ipfs":         true,
+	}
+	return validTypes[uploadType]
+}
+
+// validateUploadURL validates the URL or contract address based on type
+func validateUploadURL(uploadType, url string) bool {
+	url = strings.TrimSpace(url)
+	if url == "" {
+		return false
+	}
+
+	switch uploadType {
+	case "github":
+		return strings.HasPrefix(url, "https://github.com/")
+	case "google_drive":
+		return strings.HasPrefix(url, "https://drive.google.com/") ||
+			strings.HasPrefix(url, "https://docs.google.com/")
+	case "gitlab":
+		return strings.HasPrefix(url, "https://gitlab.com/")
+	case "bitbucket":
+		return strings.HasPrefix(url, "https://bitbucket.org/")
+	case "ipfs":
+		return strings.HasPrefix(url, "ipfs://") ||
+			strings.HasPrefix(url, "https://ipfs.io/ipfs/")
+	case "program_id":
+		return len(url) >= 32 && len(url) <= 44
+	default:
+		return false
+	}
+}
+
+func logContract(userID, contractID, event, role string) {
+	auditLog := models.AuditLog{
+		ContractID: contractID,
+		Event:      event,
+		ActorID:    userID,
+		ActorRole:  role,
+		CreatedAt:  time.Now(),
+	}
+
+	logsColl := config.DB.Collection("audit_logs")
+	logsColl.InsertOne(context.TODO(), auditLog)
+}
