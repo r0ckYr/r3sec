@@ -3,30 +3,94 @@
 import React, { useEffect, useState } from "react";
 import {
     LayoutDashboard,
-    UserCircle,
+    BarChart,
     FileCode,
     Shield,
     ChevronLeft,
     Settings,
     LogOut
 } from "lucide-react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
+import { toast } from "react-hot-toast";
+
+// Function to get initial sidebar state from localStorage (runs on the client)
+const getInitialSidebarState = () => {
+    if (typeof window !== 'undefined') {
+        const savedState = localStorage.getItem("sidebarCollapsed");
+        return savedState !== null ? JSON.parse(savedState) : false;
+    }
+    return false;
+};
 
 export default function Sidebar({ onToggle }: { onToggle?: (collapsed: boolean) => void }) {
+    // Initialize state with the value from localStorage directly
+    const [collapsed, setCollapsed] = useState(getInitialSidebarState());
+    const [userEmail, setUserEmail] = useState("");
+    const [isClient, setIsClient] = useState(false);
+    const pathname = usePathname();
+    const router = useRouter();
 
-    const [collapsed, setCollapsed] = useState(false);
+    // Mark when component is hydrated and running on client
+    useEffect(() => {
+        setIsClient(true);
+        // Call onToggle with initial state if provided
+        onToggle?.(collapsed);
+    }, [onToggle, collapsed]);
 
     const toggleSidebar = () => {
         const next = !collapsed;
         setCollapsed(next);
+        // Save to localStorage
+        localStorage.setItem("sidebarCollapsed", JSON.stringify(next));
         onToggle?.(next);
     };
 
-    const [userEmail, setUserEmail] = useState("");
-    const pathname = usePathname();
+    // Check if JWT token is valid and not expired
+    const validateToken = () => {
+        try {
+            const token = localStorage.getItem("authToken");
+            if (!token) {
+                return false;
+            }
+            const payload = JSON.parse(atob(token.split(".")[1]));
+            return payload.exp * 1000 > Date.now();
+        } catch (error) {
+            console.error("Token validation error:", error);
+            return false;
+        }
+    };
+
+    // Handle logout functionality
+    const handleLogout = () => {
+        // Clear user data from localStorage
+        localStorage.removeItem("authToken");
+        localStorage.removeItem("user");
+        // Note: We keep sidebarCollapsed state even after logout
+
+        // Redirect to home page
+        router.push("/");
+
+        // Show notification
+        toast.success("Successfully logged out");
+    };
 
     useEffect(() => {
+        // Validate token on component mount
+        if (!validateToken()) {
+            // Clear invalid token and user data
+            localStorage.removeItem("authToken");
+            localStorage.removeItem("user");
+
+            // Redirect to login page
+            router.push("/");
+
+            // Show notification
+            toast.error("Please login to continue");
+            return;
+        }
+
+        // Set user email if token is valid
         const user = localStorage.getItem("user");
         if (user) {
             try {
@@ -36,15 +100,20 @@ export default function Sidebar({ onToggle }: { onToggle?: (collapsed: boolean) 
                 console.error("Invalid user in localStorage");
             }
         }
-    }, []);
-
+    }, [router]);
 
     const menuItems = [
         { icon: <LayoutDashboard size={20} />, label: "Dashboard", href: "/dashboard" },
-        { icon: <UserCircle size={20} />, label: "Profile", href: "/profile" },
         { icon: <FileCode size={20} />, label: "Contracts", href: "/contracts" },
+        { icon: <BarChart size={20} />, label: "Reports", href: "/reports" },
         { icon: <Settings size={20} />, label: "Settings", href: "/settings" },
     ];
+
+    // Only render the component once we're on the client
+    // This prevents hydration mismatches
+    if (!isClient) {
+        return null; // Return nothing during SSR or before hydration
+    }
 
     return (
         <div className="flex">
@@ -114,14 +183,26 @@ export default function Sidebar({ onToggle }: { onToggle?: (collapsed: boolean) 
                                 <div className="text-sm font-medium text-white truncate">{userEmail || "User"}</div>
                                 <div className="text-xs text-zinc-400">Logged In</div>
                             </div>
-                            <button className="p-1 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-white">
+                            <button
+                                onClick={handleLogout}
+                                className="p-1 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-white"
+                                aria-label="Logout"
+                            >
                                 <LogOut size={18} />
                             </button>
                         </>
+                    )}
+                    {collapsed && (
+                        <button
+                            onClick={handleLogout}
+                            className="absolute bottom-4 left-1/2 transform -translate-x-1/2 p-2 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-white mt-2"
+                            aria-label="Logout"
+                        >
+                            <LogOut size={18} />
+                        </button>
                     )}
                 </div>
             </div>
         </div>
     );
 }
-

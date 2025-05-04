@@ -1,11 +1,11 @@
 "use client";
 
 import Sidebar from "../components/Sidebar";
-const ProfilePage = () => {
+const ReportPage = () => {
     return (
         <>
             <div className="min-h-screen flex items-center justify-center bg-zinc-900 text-white">
-                <h1 className="text-4xl font-bold tracking-tight">Profile</h1>
+                <h1 className="text-4xl font-bold tracking-tight">Reports</h1>
             </div>
             <div className="flex h-screen">
                 <Sidebar />
@@ -14,5 +14,5 @@ const ProfilePage = () => {
     );
 };
 
-export default ProfilePage;
+export default ReportPage;
 

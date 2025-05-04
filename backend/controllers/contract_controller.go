@@ -208,7 +208,97 @@ func DeleteContract(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Contract deleted successfully"})
 }
 
-// isValidUploadType checks if the upload type is valid
+
+func ResubmitContract(c *gin.Context) {
+	user := c.MustGet("currentUser").(models.User)
+	contractID := c.Param("id")
+	
+	objID, err := primitive.ObjectIDFromHex(contractID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid contract ID format"})
+		return
+	}
+	
+	contractsColl := config.DB.Collection("contracts")
+	var contract models.Contract
+	err = contractsColl.FindOne(
+		context.TODO(),
+		bson.M{
+			"_id": objID,
+			"user_id": user.ID.Hex(),
+			"is_deleted": false,
+		},
+	).Decode(&contract)
+	
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Contract not found"})
+		return
+	}
+	
+	fiveMinutesAgo := time.Now().Add(-5 * time.Minute)
+	if contract.CreatedAt.Before(fiveMinutesAgo) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Contracts can only be resubmitted within 5 minutes of creation",
+		})
+		return
+	}
+	
+	var req struct {
+		UploadURL   string `json:"upload_url"`
+		Description string `json:"description"`
+	}
+	
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data"})
+		return
+	}
+	
+	if req.UploadURL == "" && req.Description == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "At least one field (upload_url or description) must be provided",
+		})
+		return
+	}
+	
+	updateDoc := bson.M{"updated_at": time.Now()}
+	
+	if req.UploadURL != "" {
+		// Validate URL based on upload type
+		if !validateUploadURL(contract.UploadType, req.UploadURL) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid URL format for the upload type"})
+			return
+		}
+		updateDoc["upload_url"] = req.UploadURL
+	}
+	
+	if req.Description != "" {
+		updateDoc["description"] = req.Description
+	}
+	
+	updateDoc["status"] = "pending"
+	
+	_, err = contractsColl.UpdateOne(
+		context.TODO(),
+		bson.M{"_id": objID},
+		bson.M{"$set": updateDoc},
+	)
+	
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update contract"})
+		return
+	}
+	
+	logContract(user.ID.Hex(), contractID, "Resubmitted", "user")
+	
+	var updatedContract models.Contract
+	err = contractsColl.FindOne(context.TODO(), bson.M{"_id": objID}).Decode(&updatedContract)
+	
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Contract resubmitted successfully",
+		"contract": updatedContract,
+	})
+}
+
 func isValidUploadType(uploadType string) bool {
 	validTypes := map[string]bool{
 		"github":       true,
@@ -221,7 +311,6 @@ func isValidUploadType(uploadType string) bool {
 	return validTypes[uploadType]
 }
 
-// validateUploadURL validates the URL or contract address based on type
 func validateUploadURL(uploadType, url string) bool {
 	url = strings.TrimSpace(url)
 	if url == "" {

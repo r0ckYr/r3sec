@@ -120,7 +120,7 @@ const Register = () => {
 
     const handleGoogleAuthSuccess = (userData: any) => {
         // For Google auth, we redirect to profile page as verification is not needed
-        router.push("/profile");
+        router.push("/dashboard");
     };
 
     return (

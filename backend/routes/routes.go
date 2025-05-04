@@ -11,6 +11,10 @@ func SetupRoutes(r *gin.Engine) {
 		api.GET("/ping", controllers.Ping)
 		AuthRoutes(api)
 		UserRoutes(api)
-        ContractRoutes(api)
+		ContractRoutes(api)
+		AuditReportRoutes(api)
+		FindingRoutes(api)
+		NotificationRoutes(api)
+		AdminRoutes(api)
 	}
 }

@@ -229,3 +229,57 @@ func GoogleLogin(c *gin.Context) {
 		"user":    userResponse,
 	})
 }
+
+func AdminLogin(c *gin.Context) {
+	var req struct {
+		Email    string `json:"email" binding:"required,email"`
+		Password string `json:"password" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+
+	adminColl := config.DB.Collection("admin_users")
+	var admin models.AdminUser
+	err := adminColl.FindOne(context.TODO(), bson.M{"email": email}).Decode(&admin)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid credentials"})
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(admin.PasswordHash), []byte(req.Password)); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid credentials"})
+		return
+	}
+
+	tokenString, err := utils.GenerateAdminJWT(admin.ID.Hex(), admin.Email, admin.Role)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		return
+	}
+
+	_, err = adminColl.UpdateOne(
+		context.TODO(),
+		bson.M{"_id": admin.ID},
+		bson.M{
+			"$set": bson.M{
+				"last_login": time.Now(),
+				"updated_at": time.Now(),
+			},
+		},
+	)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Admin login successful",
+		"token":   tokenString,
+		"admin": gin.H{
+			"id":    admin.ID.Hex(),
+			"email": admin.Email,
+			"role":  admin.Role,
+		},
+	})
+}

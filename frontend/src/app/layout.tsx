@@ -27,7 +27,7 @@ export const metadata: Metadata = {
         siteName: "R3SEC",
         images: [
             {
-                url: "/og-image.png", // recommended image size: 1200x630
+                url: "/og-image.png",
                 width: 1200,
                 height: 630,
                 alt: "R3SEC Smart Contract Security Platform",

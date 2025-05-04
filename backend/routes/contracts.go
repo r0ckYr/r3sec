@@ -12,6 +12,7 @@ func ContractRoutes(r *gin.RouterGroup) {
 	{
 		contracts.GET("", controllers.ListContracts)
 		contracts.POST("", controllers.CreateContract)
+        contracts.POST("/:id/resubmit", controllers.ResubmitContract)
 		contracts.GET("/:id", controllers.GetContract)
 		contracts.DELETE("/:id", controllers.DeleteContract)
 	}

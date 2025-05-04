@@ -13,5 +13,6 @@ func AuthRoutes(r *gin.RouterGroup) {
 		auth.POST("/resend-verification", controllers.ResendVerification)
 		auth.POST("/login", controllers.Login)
 		auth.POST("/google", controllers.GoogleLogin)
+        auth.POST("/admin/login", controllers.AdminLogin)
 	}
 }

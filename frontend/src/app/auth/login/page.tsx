@@ -57,7 +57,7 @@ const Login = () => {
             localStorage.setItem("authToken", data.token);
             localStorage.setItem("user", JSON.stringify(data.user));
 
-            router.push("/settings"); // Redirect after successful login
+            router.push("/dashboard"); // Redirect after successful login
         } catch (error) {
             console.error("Login error:", error);
             setError(error.message);
@@ -578,7 +578,7 @@ const Login = () => {
                                 <OrContinueWith textColor="text-zinc-400" lineColor="bg-zinc-700" />
                                 <GoogleLoginButton
                                     backendUrl={process.env.NEXT_PUBLIC_BACKEND_URL}
-                                    onAuthSuccess={() => router.push("/settings")}
+                                    onAuthSuccess={() => router.push("/dashboard")}
                                 />
                             </div>
                         </motion.form>

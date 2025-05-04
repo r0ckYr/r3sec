@@ -11,6 +11,7 @@ func UserRoutes(r *gin.RouterGroup) {
 	authUsers := users.Use(middleware.AuthMiddleware())
 	{
 		authUsers.GET("/me", controllers.GetMe)
+		authUsers.GET("/stats", controllers.GetUserStats)
 		authUsers.PATCH("/:id", controllers.UpdateUser)
 		authUsers.DELETE("/:id", controllers.DeleteUser)
 		authUsers.PATCH("/:id/password", controllers.ChangePassword)
