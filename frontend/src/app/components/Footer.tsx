@@ -38,28 +38,26 @@ export default function Footer() {
         {
             title: "Services",
             links: [
-                { name: "Smart Contract Audits", href: "/services/audits" },
-                { name: "Security Monitoring", href: "/services/monitoring" },
-                { name: "Code Review", href: "/services/code-review" },
-                { name: "Bug Bounty Programs", href: "/services/bug-bounty" }
+                { name: "Smart Contract Audits", href: "/pages/services#audits" },
+                { name: "Security Monitoring", href: "/pages/services#monitoring" },
+                { name: "Code Review", href: "/pages/services#code-review" },
+                { name: "Bug Bounty Programs", href: "/pages/services#bug-bounty" }
             ]
         },
         {
             title: "Resources",
             links: [
-                { name: "Audit Reports", href: "/resources/reports" },
-                { name: "Security Blog", href: "/blog" },
-                { name: "Documentation", href: "/docs" },
-                { name: "Common Vulnerabilities", href: "/resources/vulnerabilities" }
+                { name: "Audit Reports", href: "/pages/resources#reports" },
+                { name: "Security Blog", href: "/pages/resources#blog" },
+                { name: "Documentation", href: "pages/resources#docs" },
+                { name: "Common Vulnerabilities", href: "/pages/resources#vulnerabilities" }
             ]
         },
         {
             title: "Company",
             links: [
-                { name: "About Us", href: "/about" },
-                { name: "Our Team", href: "/team" },
-                { name: "Careers", href: "/careers" },
-                { name: "Contact", href: "/contact" }
+                { name: "About Us", href: "/pages/about" },
+                { name: "Contact", href: "/pages/contact" }
             ]
         }
     ];
@@ -122,8 +120,8 @@ export default function Footer() {
 
                         <div className="flex items-center text-zinc-400 text-sm">
                             <Mail size={16} className="mr-2" />
-                            <a href="mailto:security@r3sec.com" className="hover:text-green-400 transition-colors">
-                                security@r3sec.com
+                            <a href="mailto:support@r3sec.com" className="hover:text-green-400 transition-colors">
+                                support@r3sec.com
                             </a>
                         </div>
                     </motion.div>
@@ -162,9 +160,8 @@ export default function Footer() {
 
                     <div className="flex flex-col md:flex-row md:items-center gap-4">
                         <div className="flex flex-wrap gap-6 text-sm text-zinc-500 justify-center">
-                            <a href="/privacy" className="hover:text-zinc-300 transition-colors">Privacy Policy</a>
-                            <a href="/terms" className="hover:text-zinc-300 transition-colors">Terms of Service</a>
-                            <a href="/legal" className="hover:text-zinc-300 transition-colors">Legal</a>
+                            <a href="/pages/privacy" className="hover:text-zinc-300 transition-colors">Privacy Policy</a>
+                            <a href="/pages/terms" className="hover:text-zinc-300 transition-colors">Terms of Service</a>
                         </div>
                         <span className="text-zinc-600 text-sm md:ml-6">© {new Date().getFullYear()} R3SEC. All rights reserved.</span>
                     </div>

@@ -28,24 +28,24 @@ export default function Navbar() {
         {
             name: "Products",
             dropdown: [
-                { name: "Smart Contract Audits", href: "/audits" },
-                { name: "Security Dashboard", href: "/dashboard" },
-                { name: "Vulnerability Reports", href: "/reports" },
-                { name: "Audit Marketplace", href: "/marketplace" }
+                { name: "Smart Contract Audits", href: "/pages/products#audits" },
+                { name: "Security Dashboard", href: "/pages/products#dashboard" },
+                { name: "Vulnerability Reports", href: "/pages/products#reports" },
+                { name: "Audit Marketplace", href: "/pages/products#marketplace" }
             ]
         },
         {
             name: "Solutions",
             dropdown: [
-                { name: "For Developers", href: "/developers" },
-                { name: "For DAOs", href: "/daos" },
-                { name: "For Enterprises", href: "/enterprise" },
-                { name: "For Auditors", href: "/auditors" }
+                { name: "For Developers", href: "/pages/solutions#developers" },
+                { name: "For DAOs", href: "/pages/solutions#daos" },
+                { name: "For Enterprises", href: "/pages/solutions#enterprise" },
+                { name: "For Auditors", href: "/pages/solutions#auditors" }
             ]
         },
         { name: "Pricing", href: "/pricing" },
-        { name: "Resources", href: "/resources" },
-        { name: "About", href: "/about" }
+        { name: "Resources", href: "/pages/resources" },
+        { name: "About", href: "/pages/about" }
     ];
 
     const toggleDropdown = (index) => {
