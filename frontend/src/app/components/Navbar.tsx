@@ -207,19 +207,20 @@ export default function Navbar() {
                                     Sign In
                                 </motion.a>
                                 <motion.a
-                                    href="/signup"
+                                    href="/auth/register"
                                     className="px-4 py-2 bg-green-500 hover:bg-green-600 text-black rounded-md text-sm font-medium flex items-center shadow-md shadow-green-900/20 transition-all duration-200"
                                     whileHover={{ scale: 1.03 }}
                                     whileTap={{ scale: 0.97 }}
                                 >
                                     Get Started
-                                    <motion.span
+                                    <motion.a
+                                        href="/auth/register"
                                         animate={{ x: [0, 3, 0] }}
                                         transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
                                         className="ml-1"
                                     >
                                         <ExternalLink className="h-3.5 w-3.5" />
-                                    </motion.span>
+                                    </motion.a>
                                 </motion.a>
                             </div>
                         </div>

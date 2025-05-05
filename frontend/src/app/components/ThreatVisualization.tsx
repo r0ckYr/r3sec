@@ -469,6 +469,7 @@ export default function ThreatVisualization() {
                         <motion.button
                             className="bg-green-500 hover:bg-green-600 text-black px-8 py-4 rounded-lg font-medium text-lg inline-flex items-center"
                             whileHover={{ scale: 1.05 }}
+                            onClick={() => { window.location.href = '/auth/register' }}
                             whileTap={{ scale: 0.98 }}
                         >
                             Secure Your Code Now

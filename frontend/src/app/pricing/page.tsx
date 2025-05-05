@@ -76,7 +76,7 @@ const PricingPage = () => {
                                     <span className="text-zinc-300">1 follow-up review</span>
                                 </li>
                             </ul>
-                            <button className="w-full py-3 rounded-lg bg-zinc-800 text-white hover:bg-zinc-700 transition-colors font-medium">
+                            <button className="w-full py-3 rounded-lg bg-zinc-800 text-white hover:bg-zinc-700 transition-colors font-medium" onClick={() => { window.location.href = '/auth/register' }}>
                                 Get Started
                             </button>
                         </div>
@@ -117,7 +117,7 @@ const PricingPage = () => {
                                     <span className="text-zinc-300">Gas optimizations</span>
                                 </li>
                             </ul>
-                            <button className="w-full py-3 rounded-lg bg-green-600 text-white hover:bg-green-500 transition-colors font-medium">
+                            <button className="w-full py-3 rounded-lg bg-green-600 text-white hover:bg-green-500 transition-colors font-medium" onClick={() => { window.location.href = '/auth/register' }}>
                                 Get Started
                             </button>
                         </div>
@@ -155,7 +155,7 @@ const PricingPage = () => {
                                     <span className="text-zinc-300">Direct communication</span>
                                 </li>
                             </ul>
-                            <button className="w-full py-3 rounded-lg bg-zinc-800 text-white hover:bg-zinc-700 transition-colors font-medium">
+                            <button className="w-full py-3 rounded-lg bg-zinc-800 text-white hover:bg-zinc-700 transition-colors font-medium" onClick={() => { window.location.href = '/auth/register' }}>
                                 Get Started
                             </button>
                         </div>

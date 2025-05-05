@@ -99,6 +99,7 @@ export default function Hero() {
                         <motion.button
                             className="bg-green-500 hover:bg-green-600 text-black px-8 py-4 rounded-lg font-medium text-lg group flex items-center"
                             variants={buttonVariants}
+                            onClick={() => { window.location.href = '/auth/register' }}
                             whileHover="hover"
                             whileTap="tap"
                         >
@@ -115,6 +116,7 @@ export default function Hero() {
                         <motion.button
                             className="bg-transparent border border-zinc-700 hover:border-green-500 text-white px-8 py-4 rounded-lg font-medium text-lg transition-all"
                             variants={buttonVariants}
+                            onClick={() => { window.location.href = '/pricing' }}
                             whileHover="hover"
                             whileTap="tap"
                         >
@@ -227,6 +229,7 @@ export default function Hero() {
                         <motion.button
                             className="bg-green-500 hover:bg-green-600 text-black px-8 py-4 rounded-lg font-medium text-lg inline-flex items-center"
                             variants={buttonVariants}
+                            onClick={() => { window.location.href = '/auth/register' }}
                             whileHover="hover"
                             whileTap="tap"
                         >
