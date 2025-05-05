@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast, Toaster } from "react-hot-toast";
 import Sidebar from "../components/Sidebar";
-import { Shield, Mail, Lock, Bell, Trash2 } from "lucide-react";
+import { Shield, Mail, Lock, Bell, Trash2, AlertCircle, CheckCircle } from "lucide-react";
 
 // Types
 interface User {
@@ -21,21 +21,29 @@ export default function Settings() {
     const router = useRouter();
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
-    const [updating, setUpdating] = useState(false);
-    const [changingPassword, setChangingPassword] = useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-    // Form states
-    const [email, setEmail] = useState("");
-    const [newPassword, setNewPassword] = useState("");
-    const [confirmPassword, setConfirmPassword] = useState("");
+    // Form states with sections
+    const [emailSection, setEmailSection] = useState({
+        email: "",
+        updating: false,
+        touched: false
+    });
+
+    const [passwordSection, setPasswordSection] = useState({
+        newPassword: "",
+        confirmPassword: "",
+        changing: false,
+        passwordStrength: 0,
+        touched: false
+    });
+
     const [notificationsEnabled, setNotificationsEnabled] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [deletingAccount, setDeletingAccount] = useState(false);
 
     // API configuration
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
-
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-
 
     // Get auth headers for API calls
     const getAuthHeaders = () => {
@@ -60,6 +68,8 @@ export default function Settings() {
 
             if (!response.ok) {
                 if (response.status === 401) {
+                    toast.error("Session expired. Please login again.");
+                    localStorage.removeItem("authToken");
                     router.push("/");
                     return;
                 }
@@ -68,7 +78,13 @@ export default function Settings() {
 
             const userData = await response.json();
             setUser(userData);
-            setEmail(userData.email);
+
+            // Initialize form states
+            setEmailSection({
+                ...emailSection,
+                email: userData.email
+            });
+
             setNotificationsEnabled(userData.email_notifications_enabled);
         } catch (error) {
             toast.error("Failed to load user data");
@@ -78,16 +94,34 @@ export default function Settings() {
         }
     };
 
+    // Check password strength
+    const checkPasswordStrength = (password: string): number => {
+        if (!password) return 0;
+
+        let strength = 0;
+        if (password.length >= 8) strength += 1;
+        if (password.match(/[A-Z]/)) strength += 1;
+        if (password.match(/[0-9]/)) strength += 1;
+        if (password.match(/[^A-Za-z0-9]/)) strength += 1;
+
+        return strength;
+    };
+
     const updateEmail = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!user) return;
 
+        if (emailSection.email === user.email) {
+            toast.error("Please enter a different email address");
+            return;
+        }
+
         try {
-            setUpdating(true);
+            setEmailSection({ ...emailSection, updating: true });
             const response = await fetch(`${backendUrl}/api/user/${user.id}`, {
                 method: "PATCH",
                 headers: getAuthHeaders(),
-                body: JSON.stringify({ email })
+                body: JSON.stringify({ email: emailSection.email })
             });
 
             if (!response.ok) {
@@ -100,7 +134,7 @@ export default function Settings() {
         } catch (error: any) {
             toast.error(error.message || "An unknown error occurred");
         } finally {
-            setUpdating(false);
+            setEmailSection({ ...emailSection, updating: false, touched: false });
         }
     };
 
@@ -108,22 +142,22 @@ export default function Settings() {
         e.preventDefault();
         if (!user) return;
 
-        if (newPassword.length < 8) {
+        if (passwordSection.newPassword.length < 8) {
             toast.error("Password must be at least 8 characters");
             return;
         }
 
-        if (newPassword !== confirmPassword) {
+        if (passwordSection.newPassword !== passwordSection.confirmPassword) {
             toast.error("Passwords do not match");
             return;
         }
 
         try {
-            setChangingPassword(true);
+            setPasswordSection({ ...passwordSection, changing: true });
             const response = await fetch(`${backendUrl}/api/user/${user.id}/password`, {
                 method: "PATCH",
                 headers: getAuthHeaders(),
-                body: JSON.stringify({ new_password: newPassword })
+                body: JSON.stringify({ new_password: passwordSection.newPassword })
             });
 
             if (!response.ok) {
@@ -132,12 +166,17 @@ export default function Settings() {
             }
 
             toast.success("Password changed successfully");
-            setNewPassword("");
-            setConfirmPassword("");
+            setPasswordSection({
+                newPassword: "",
+                confirmPassword: "",
+                changing: false,
+                passwordStrength: 0,
+                touched: false
+            });
         } catch (error: any) {
             toast.error(error.message || "An unknown error occurred");
         } finally {
-            setChangingPassword(false);
+            setPasswordSection({ ...passwordSection, changing: false });
         }
     };
 
@@ -170,6 +209,7 @@ export default function Settings() {
         if (!user) return;
 
         try {
+            setDeletingAccount(true);
             const response = await fetch(`${backendUrl}/api/user/${user.id}`, {
                 method: "DELETE",
                 headers: getAuthHeaders()
@@ -186,18 +226,18 @@ export default function Settings() {
         } catch (error: any) {
             toast.error(error.message || "An unknown error occurred");
         } finally {
+            setDeletingAccount(false);
             setShowDeleteConfirm(false);
         }
     };
 
-    // Loading component
+    // Components
     const LoadingSpinner = () => (
         <div className="flex-1 bg-black p-6 flex items-center justify-center">
             <div className="h-8 w-8 rounded-full border-4 border-zinc-700 border-t-green-400 animate-spin"></div>
         </div>
     );
 
-    // Form button with loading state
     const ActionButton = ({
         isLoading,
         disabled,
@@ -205,7 +245,8 @@ export default function Settings() {
         text,
         type = "submit",
         onClick,
-        className = "bg-green-600 hover:bg-green-500"
+        className = "bg-green-600 hover:bg-green-500",
+        icon = null
     }: {
         isLoading: boolean;
         disabled: boolean;
@@ -214,12 +255,13 @@ export default function Settings() {
         type?: "button" | "submit";
         onClick?: () => void;
         className?: string;
+        icon?: React.ReactNode;
     }) => (
         <button
             type={type}
             onClick={onClick}
             disabled={isLoading || disabled}
-            className={`px-4 py-2 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${className}`}
+            className={`px-4 py-2 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${className} flex items-center justify-center space-x-2`}
         >
             {isLoading ? (
                 <div className="flex items-center space-x-2">
@@ -227,9 +269,70 @@ export default function Settings() {
                     <span>{loadingText}</span>
                 </div>
             ) : (
-                text
+                <>
+                    {icon && <span>{icon}</span>}
+                    <span>{text}</span>
+                </>
             )}
         </button>
+    );
+
+    const PasswordStrengthIndicator = ({ strength }: { strength: number }) => {
+        const getColor = () => {
+            if (strength === 0) return "bg-zinc-700";
+            if (strength === 1) return "bg-red-500";
+            if (strength === 2) return "bg-orange-500";
+            if (strength === 3) return "bg-yellow-500";
+            return "bg-green-500";
+        };
+
+        const getMessage = () => {
+            if (strength === 0) return "Enter password";
+            if (strength === 1) return "Weak";
+            if (strength === 2) return "Fair";
+            if (strength === 3) return "Good";
+            return "Strong";
+        };
+
+        return (
+            <div className="mt-1 space-y-1">
+                <div className="flex h-1.5 w-full space-x-1">
+                    <div className={`h-full w-1/4 rounded-sm ${strength >= 1 ? getColor() : "bg-zinc-700"}`}></div>
+                    <div className={`h-full w-1/4 rounded-sm ${strength >= 2 ? getColor() : "bg-zinc-700"}`}></div>
+                    <div className={`h-full w-1/4 rounded-sm ${strength >= 3 ? getColor() : "bg-zinc-700"}`}></div>
+                    <div className={`h-full w-1/4 rounded-sm ${strength >= 4 ? getColor() : "bg-zinc-700"}`}></div>
+                </div>
+                <p className="text-xs text-zinc-500">{getMessage()}</p>
+            </div>
+        );
+    };
+
+    const SectionCard = ({
+        title,
+        icon,
+        iconColor = "text-green-400",
+        children,
+        className = ""
+    }: {
+        title: string;
+        icon: React.ReactNode;
+        iconColor?: string;
+        children: React.ReactNode;
+        className?: string;
+    }) => (
+        <div className={`p-6 rounded-xl border border-zinc-800 bg-zinc-900 space-y-4 transition-all duration-150 hover:border-zinc-700 ${className}`}>
+            <div className="flex items-center space-x-3">
+                <div className={iconColor}>{icon}</div>
+                <h2 className="text-xl font-semibold text-white">{title}</h2>
+            </div>
+            {children}
+        </div>
+    );
+
+    const SettingsContainer = ({ children }: { children: React.ReactNode }) => (
+        <div className="max-w-3xl mx-auto py-8 px-4 sm:px-6 space-y-6">
+            {children}
+        </div>
     );
 
     // Main content renderer
@@ -237,11 +340,11 @@ export default function Settings() {
         if (!user) return null;
 
         return (
-            <div className="flex-1 bg-black p-6 space-y-6">
-                <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold text-white">Settings</h1>
-                    <div className="flex items-center space-x-2">
-                        <Shield size={20} className={user.is_verified ? "text-green-400" : "text-amber-500"} />
+            <SettingsContainer>
+                <div className="flex items-center justify-between mb-8">
+                    <h1 className="text-3xl font-bold text-white">Settings</h1>
+                    <div className="flex items-center space-x-2 px-3 py-1.5 rounded-full bg-zinc-800">
+                        <Shield size={18} className={user.is_verified ? "text-green-400" : "text-amber-500"} />
                         <span className={`text-sm ${user.is_verified ? "text-green-400" : "text-amber-500"}`}>
                             {user.is_verified ? "Verified Account" : "Unverified Account"}
                         </span>
@@ -249,100 +352,141 @@ export default function Settings() {
                 </div>
 
                 {/* Email Settings */}
-                <div className="p-6 rounded-xl border border-zinc-800 bg-zinc-900 space-y-4">
-                    <div className="flex items-center space-x-3">
-                        <Mail size={20} className="text-green-400" />
-                        <h2 className="text-xl font-semibold text-white">Email Settings</h2>
-                    </div>
-
+                <SectionCard title="Email Settings" icon={<Mail size={20} />}>
                     <form onSubmit={updateEmail} className="space-y-4">
                         <div className="space-y-2">
-                            <label htmlFor="email" className="block text-sm font-medium text-zinc-400">
+                            <label htmlFor="email" className="block text-sm font-medium text-zinc-300">
                                 Email Address
                             </label>
-                            <input
-                                type="email"
-                                id="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                required
-                            />
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                            <ActionButton
-                                isLoading={updating}
-                                disabled={email === user.email}
-                                loadingText="Updating..."
-                                text="Update Email"
-                            />
+                            <div className="relative">
+                                <input
+                                    type="email"
+                                    id="email"
+                                    value={emailSection.email}
+                                    onChange={(e) => setEmailSection({
+                                        ...emailSection,
+                                        email: e.target.value,
+                                        touched: true
+                                    })}
+                                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                                    placeholder="your@email.com"
+                                    required
+                                />
+                                {!user.is_verified && (
+                                    <div className="absolute inset-y-0 right-3 flex items-center">
+                                        <AlertCircle size={18} className="text-amber-500" />
+                                    </div>
+                                )}
+                            </div>
 
                             {!user.is_verified && (
-                                <span className="text-amber-500 text-sm">
-                                    Please verify your email address
-                                </span>
+                                <p className="text-amber-500 text-sm flex items-center space-x-1">
+                                    <span>Please verify your email address</span>
+                                </p>
                             )}
                         </div>
+
+                        <div className="flex items-center justify-end">
+                            <ActionButton
+                                isLoading={emailSection.updating}
+                                disabled={emailSection.email === user.email || !emailSection.touched}
+                                loadingText="Updating..."
+                                text="Update Email"
+                                icon={<Mail size={16} />}
+                            />
+                        </div>
                     </form>
-                </div>
+                </SectionCard>
 
                 {/* Password Settings */}
-                <div className="p-6 rounded-xl border border-zinc-800 bg-zinc-900 space-y-4">
-                    <div className="flex items-center space-x-3">
-                        <Lock size={20} className="text-green-400" />
-                        <h2 className="text-xl font-semibold text-white">Password Settings</h2>
-                    </div>
-
+                <SectionCard title="Password Settings" icon={<Lock size={20} />}>
                     <form onSubmit={updatePassword} className="space-y-4">
                         <div className="space-y-2">
-                            <label htmlFor="new-password" className="block text-sm font-medium text-zinc-400">
+                            <label htmlFor="new-password" className="block text-sm font-medium text-zinc-300">
                                 New Password
                             </label>
                             <input
                                 type="password"
                                 id="new-password"
-                                value={newPassword}
-                                onChange={(e) => setNewPassword(e.target.value)}
-                                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                value={passwordSection.newPassword}
+                                onChange={(e) => {
+                                    const newPassword = e.target.value;
+                                    setPasswordSection({
+                                        ...passwordSection,
+                                        newPassword,
+                                        passwordStrength: checkPasswordStrength(newPassword),
+                                        touched: true
+                                    });
+                                }}
+                                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
                                 required
                                 minLength={8}
+                                placeholder="••••••••"
                             />
+                            <PasswordStrengthIndicator strength={passwordSection.passwordStrength} />
                         </div>
 
                         <div className="space-y-2">
-                            <label htmlFor="confirm-password" className="block text-sm font-medium text-zinc-400">
+                            <label htmlFor="confirm-password" className="block text-sm font-medium text-zinc-300">
                                 Confirm Password
                             </label>
                             <input
                                 type="password"
                                 id="confirm-password"
-                                value={confirmPassword}
-                                onChange={(e) => setConfirmPassword(e.target.value)}
-                                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                value={passwordSection.confirmPassword}
+                                onChange={(e) => setPasswordSection({
+                                    ...passwordSection,
+                                    confirmPassword: e.target.value,
+                                    touched: true
+                                })}
+                                className={`w-full px-4 py-3 bg-zinc-800 border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all ${passwordSection.newPassword &&
+                                    passwordSection.confirmPassword &&
+                                    passwordSection.newPassword !== passwordSection.confirmPassword
+                                    ? "border-red-500"
+                                    : "border-zinc-700"
+                                    }`}
                                 required
                                 minLength={8}
+                                placeholder="••••••••"
                             />
+
+                            {passwordSection.newPassword &&
+                                passwordSection.confirmPassword &&
+                                passwordSection.newPassword !== passwordSection.confirmPassword && (
+                                    <p className="text-red-500 text-sm flex items-center space-x-1">
+                                        <AlertCircle size={14} />
+                                        <span>Passwords do not match</span>
+                                    </p>
+                                )}
                         </div>
 
-                        <ActionButton
-                            isLoading={changingPassword}
-                            disabled={!newPassword || !confirmPassword}
-                            loadingText="Changing Password..."
-                            text="Change Password"
-                        />
+                        <div className="pt-2 flex justify-end">
+                            <ActionButton
+                                isLoading={passwordSection.changing}
+                                disabled={
+                                    !passwordSection.newPassword ||
+                                    !passwordSection.confirmPassword ||
+                                    passwordSection.newPassword !== passwordSection.confirmPassword ||
+                                    passwordSection.passwordStrength < 2 ||
+                                    !passwordSection.touched
+                                }
+                                loadingText="Changing Password..."
+                                text="Change Password"
+                                icon={<Lock size={16} />}
+                            />
+                        </div>
                     </form>
-                </div>
+                </SectionCard>
 
                 {/* Notification Settings */}
-                <div className="p-6 rounded-xl border border-zinc-800 bg-zinc-900 space-y-4">
-                    <div className="flex items-center space-x-3">
-                        <Bell size={20} className="text-green-400" />
-                        <h2 className="text-xl font-semibold text-white">Notification Settings</h2>
-                    </div>
-
+                <SectionCard title="Notification Settings" icon={<Bell size={20} />}>
                     <div className="flex items-center justify-between">
-                        <span className="text-zinc-300">Email Notifications</span>
+                        <div>
+                            <h3 className="text-zinc-300 font-medium">Email Notifications</h3>
+                            <p className="text-sm text-zinc-500 mt-1">
+                                Receive email notifications about security alerts, updates, and account activity.
+                            </p>
+                        </div>
                         <label className="relative inline-flex items-center cursor-pointer">
                             <input
                                 type="checkbox"
@@ -353,53 +497,55 @@ export default function Settings() {
                             <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-green-500 rounded-full peer peer-checked:bg-green-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
                         </label>
                     </div>
-                    <p className="text-sm text-zinc-500">
-                        Receive email notifications about security alerts, updates, and account activity.
-                    </p>
-                </div>
+                </SectionCard>
 
                 {/* Danger Zone */}
-                <div className="p-6 rounded-xl border border-red-900/20 bg-red-950/10 space-y-4">
-                    <div className="flex items-center space-x-3">
-                        <Trash2 size={20} className="text-red-500" />
-                        <h2 className="text-xl font-semibold text-white">Danger Zone</h2>
-                    </div>
-
+                <SectionCard
+                    title="Danger Zone"
+                    icon={<Trash2 size={20} />}
+                    iconColor="text-red-500"
+                    className="border-red-900/20 bg-red-950/10 hover:border-red-900/30"
+                >
                     <p className="text-sm text-zinc-400">
-                        Once you delete your account, there is no going back. Please be certain.
+                        Once you delete your account, there is no going back. This will permanently erase all your data.
                     </p>
 
                     {showDeleteConfirm ? (
-                        <div className="space-y-4">
-                            <p className="text-red-400 font-medium">Are you sure you want to delete your account?</p>
+                        <div className="mt-6 p-4 border border-red-500/20 rounded-lg bg-red-950/20 space-y-4">
+                            <p className="text-red-400 font-medium flex items-center space-x-2">
+                                <AlertCircle size={18} />
+                                <span>Are you sure you want to delete your account?</span>
+                            </p>
                             <div className="flex space-x-3">
                                 <ActionButton
-                                    isLoading={false}
+                                    isLoading={deletingAccount}
                                     disabled={false}
-                                    loadingText=""
+                                    loadingText="Deleting..."
                                     text="Yes, Delete Account"
                                     type="button"
                                     onClick={deleteAccount}
                                     className="bg-red-600 hover:bg-red-500"
+                                    icon={<Trash2 size={16} />}
                                 />
                                 <button
                                     onClick={() => setShowDeleteConfirm(false)}
-                                    className="px-4 py-2 bg-zinc-700 text-white rounded-lg hover:bg-zinc-600 transition-colors"
+                                    className="px-4 py-2 bg-zinc-700 text-white rounded-lg hover:bg-zinc-600 transition-colors flex items-center space-x-2"
                                 >
-                                    Cancel
+                                    <span>Cancel</span>
                                 </button>
                             </div>
                         </div>
                     ) : (
                         <button
                             onClick={() => setShowDeleteConfirm(true)}
-                            className="px-4 py-2 bg-zinc-800 text-red-400 border border-red-900/30 rounded-lg hover:bg-red-900/20 transition-colors"
+                            className="mt-2 px-4 py-2 bg-zinc-800 text-red-400 border border-red-900/30 rounded-lg hover:bg-red-900/20 transition-colors flex items-center space-x-2"
                         >
-                            Delete Account
+                            <Trash2 size={16} />
+                            <span>Delete Account</span>
                         </button>
                     )}
-                </div>
-            </div>
+                </SectionCard>
+            </SettingsContainer>
         );
     };
 
@@ -413,6 +559,7 @@ export default function Settings() {
                         background: '#27272a',
                         color: '#fff',
                         border: '1px solid #3f3f46',
+                        borderRadius: '8px',
                     },
                     success: {
                         iconTheme: {
@@ -431,12 +578,12 @@ export default function Settings() {
 
             {/* Layout with dynamic sidebar */}
             <Sidebar onToggle={setSidebarCollapsed} />
-            <div
-                className={`min-h-screen transition-all duration-300 ${sidebarCollapsed ? 'ml-20' : 'ml-64'
+            <main
+                className={`min-h-screen bg-black transition-all duration-300 ${sidebarCollapsed ? 'ml-20' : 'ml-64'
                     }`}
             >
                 {loading ? <LoadingSpinner /> : renderContent()}
-            </div>
+            </main>
         </>
     );
 }

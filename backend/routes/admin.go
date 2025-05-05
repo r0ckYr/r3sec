@@ -19,5 +19,8 @@ func AdminRoutes(r *gin.RouterGroup) {
 		admin.GET("/contracts/:id/logs", controllers.AdminGetContractLogs)
         admin.POST("/reports", controllers.CreateAuditReport)
 		admin.POST("/reports/:id/findings", controllers.AddReportFindings)
+		admin.GET("/chat/contracts/:id/messages", controllers.AdminGetContractMessages)
+		admin.POST("/chat/contracts/:id/messages", controllers.AdminSendMessage)
+        admin.PUT("/chat/messages/:id/read", controllers.AdminMarkMessageRead)
 	}
 }

@@ -15,7 +15,6 @@ import (
 
 func ListAuditReports(c *gin.Context) {
 	user := c.MustGet("currentUser").(models.User)
-
 	contractsColl := config.DB.Collection("contracts")
 	contractCursor, err := contractsColl.Find(
 		context.TODO(),
@@ -24,51 +23,63 @@ func ListAuditReports(c *gin.Context) {
 			"is_deleted": false,
 		},
 	)
-
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve contracts"})
 		return
 	}
 	defer contractCursor.Close(context.TODO())
-
 	var contracts []models.Contract
 	if err = contractCursor.All(context.TODO(), &contracts); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode contracts"})
 		return
 	}
-
 	if len(contracts) == 0 {
 		c.JSON(http.StatusOK, gin.H{"reports": []models.AuditReport{}})
 		return
+	}
+
+	contractMap := make(map[string]string)
+	for _, contract := range contracts {
+		contractMap[contract.ID] = contract.Name
 	}
 
 	var contractIDs []string
 	for _, contract := range contracts {
 		contractIDs = append(contractIDs, contract.ID)
 	}
-
 	reportsColl := config.DB.Collection("audit_reports")
 	opts := options.Find().SetSort(bson.M{"uploaded_at": -1}) // Newest first
-
 	reportCursor, err := reportsColl.Find(
 		context.TODO(),
 		bson.M{"contract_id": bson.M{"$in": contractIDs}},
 		opts,
 	)
-
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve audit reports"})
 		return
 	}
 	defer reportCursor.Close(context.TODO())
-
 	var reports []models.AuditReport
 	if err = reportCursor.All(context.TODO(), &reports); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode audit reports"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"reports": reports})
+	type ReportWithContractName struct {
+		models.AuditReport
+		ContractName string `json:"contract_name"`
+	}
+
+	var reportsWithNames []ReportWithContractName
+	for _, report := range reports {
+		reportWithName := ReportWithContractName{
+			AuditReport:   report,
+			ContractName: contractMap[report.ContractID],
+		}
+		reportsWithNames = append(reportsWithNames, reportWithName)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"reports": reportsWithNames})
 }
 
 func GetAuditReport(c *gin.Context) {

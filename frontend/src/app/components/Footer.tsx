@@ -66,9 +66,8 @@ export default function Footer() {
 
     // Social media links
     const socialLinks = [
-        { name: "GitHub", icon: <Github size={20} />, href: "https://github.com/r3sec" },
-        { name: "Twitter", icon: <Twitter size={20} />, href: "https://twitter.com/r3sec" },
-        { name: "LinkedIn", icon: <Linkedin size={20} />, href: "https://linkedin.com/company/r3sec" }
+        { name: "GitHub", icon: <Github size={20} />, href: "https://github.com/r0ckYr/r3sec" },
+        { name: "Twitter", icon: <Twitter size={20} />, href: "https://x.com/r3sec_official" },
     ];
 
     return (
@@ -80,59 +79,6 @@ export default function Footer() {
                 variants={containerVariants}
                 viewport={{ once: true, amount: 0.05 }}
             >
-                {/* Newsletter & CTA Section */}
-                <motion.div
-                    className="max-w-5xl mx-auto mb-14"
-                    variants={itemVariants}
-                >
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 md:p-8">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-                            <div>
-                                <h3 className="text-2xl font-bold mb-4">
-                                    Stay Updated on Solana Security
-                                </h3>
-                                <p className="text-zinc-400 mb-6">
-                                    Get weekly security alerts, audit reports, and vulnerability insights delivered straight to your inbox.
-                                </p>
-
-                                <div className="flex flex-col sm:flex-row gap-3">
-                                    <input
-                                        type="email"
-                                        placeholder="Enter your email"
-                                        className="bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-white flex-grow focus:outline-none focus:border-green-500"
-                                    />
-                                    <motion.button
-                                        className="bg-green-500 hover:bg-green-600 text-black px-6 py-3 rounded-lg font-medium text-sm inline-flex items-center whitespace-nowrap"
-                                        whileHover={{ scale: 1.03 }}
-                                        whileTap={{ scale: 0.98 }}
-                                    >
-                                        Subscribe
-                                        <ArrowRight size={16} className="ml-2" />
-                                    </motion.button>
-                                </div>
-                            </div>
-
-                            <div className="border-l border-zinc-800 pl-8 hidden md:block">
-                                <div className="flex items-center mb-4">
-                                    <MessageSquare size={20} className="text-green-400 mr-2" />
-                                    <h4 className="font-semibold">Need an urgent audit?</h4>
-                                </div>
-                                <p className="text-zinc-400 mb-4 text-sm">
-                                    Fast-track audits available for projects with imminent launches.
-                                </p>
-                                <motion.a
-                                    href="/contact"
-                                    className="bg-zinc-800 hover:bg-zinc-700 px-6 py-3 rounded-lg font-medium text-sm inline-flex items-center"
-                                    whileHover={{ scale: 1.03 }}
-                                    whileTap={{ scale: 0.98 }}
-                                >
-                                    Schedule Consultation
-                                    <ExternalLink size={14} className="ml-2" />
-                                </motion.a>
-                            </div>
-                        </div>
-                    </div>
-                </motion.div>
 
                 {/* Main Footer Content */}
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-10">

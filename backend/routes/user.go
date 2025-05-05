@@ -12,6 +12,7 @@ func UserRoutes(r *gin.RouterGroup) {
 	{
 		authUsers.GET("/me", controllers.GetMe)
 		authUsers.GET("/stats", controllers.GetUserStats)
+        authUsers.GET("/unread-messages", controllers.GetUserUnreadMessageCount)
 		authUsers.PATCH("/:id", controllers.UpdateUser)
 		authUsers.DELETE("/:id", controllers.DeleteUser)
 		authUsers.PATCH("/:id/password", controllers.ChangePassword)

@@ -312,7 +312,7 @@ export default function Dashboard() {
                                     <p className="text-white font-semibold">{githubContracts}</p>
                                 </div>
                                 <div>
-                                    <p className="text-xs text-zinc-500">Program ID</p>
+                                    <p className="text-xs text-zinc-500">Contract Address</p>
                                     <p className="text-white font-semibold">{programIdContracts}</p>
                                 </div>
                             </div>

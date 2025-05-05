@@ -14,9 +14,7 @@ import (
 	"r3sec/models"
 )
 
-// CreateAuditReport handles creation of a new audit report for a contract
 func CreateAuditReport(c *gin.Context) {
-	// Verify admin is authenticated
 	admin, exists := c.Get("currentAdminUser")
 	if !exists {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Admin authentication error"})
@@ -24,7 +22,6 @@ func CreateAuditReport(c *gin.Context) {
 	}
 	adminUser := admin.(models.AdminUser)
 
-	// Parse request body
 	var req struct {
 		ContractID      string `json:"contract_id" binding:"required"`
 		ReportURL       string `json:"report_url" binding:"required"`
@@ -38,14 +35,12 @@ func CreateAuditReport(c *gin.Context) {
 		return
 	}
 
-	// Validate contract ID format
 	contractObjID, err := primitive.ObjectIDFromHex(req.ContractID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid contract ID format"})
 		return
 	}
 
-	// Verify contract exists
 	contractsColl := config.DB.Collection("contracts")
 	var contract models.Contract
 	err = contractsColl.FindOne(context.TODO(), bson.M{"_id": contractObjID}).Decode(&contract)
@@ -54,7 +49,6 @@ func CreateAuditReport(c *gin.Context) {
 		return
 	}
 
-	// Check if report already exists for this contract
 	reportsColl := config.DB.Collection("audit_reports")
 	count, err := reportsColl.CountDocuments(context.TODO(), bson.M{"contract_id": req.ContractID})
 	if err == nil && count > 0 {
@@ -62,7 +56,6 @@ func CreateAuditReport(c *gin.Context) {
 		return
 	}
 
-	// Create the audit report
 	now := time.Now()
 	auditReport := models.AuditReport{
 		ContractID:      req.ContractID,
@@ -75,19 +68,16 @@ func CreateAuditReport(c *gin.Context) {
 		UpdatedAt:       now,
 	}
 
-	// Insert report into database
 	result, err := reportsColl.InsertOne(context.TODO(), auditReport)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create audit report"})
 		return
 	}
 
-	// Get the ID of the inserted document
 	if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
 		auditReport.ID = oid.Hex()
 	}
 
-	// Update contract status to completed
 	_, err = contractsColl.UpdateOne(
 		context.TODO(),
 		bson.M{"_id": contractObjID},
@@ -99,7 +89,6 @@ func CreateAuditReport(c *gin.Context) {
 		},
 	)
 
-	// Create audit log entry
 	log := models.AuditLog{
 		ContractID: req.ContractID,
 		Event:      "Report Uploaded",
@@ -111,7 +100,6 @@ func CreateAuditReport(c *gin.Context) {
 	logsColl := config.DB.Collection("audit_logs")
 	logsColl.InsertOne(context.TODO(), log)
 
-	// Create notification for user
 	notification := models.Notification{
 		UserID:    contract.UserID,
 		Title:     "Audit Report Available",
@@ -130,9 +118,7 @@ func CreateAuditReport(c *gin.Context) {
 	})
 }
 
-// AddReportFindings adds findings to an existing audit report
 func AddReportFindings(c *gin.Context) {
-	// Verify admin is authenticated
 	admin, exists := c.Get("currentAdminUser")
 	if !exists {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Admin authentication error"})
@@ -140,17 +126,14 @@ func AddReportFindings(c *gin.Context) {
 	}
 	adminUser := admin.(models.AdminUser)
 
-	// Get report ID from URL parameter
 	reportID := c.Param("id")
 
-	// Validate report ID format
 	reportObjID, err := primitive.ObjectIDFromHex(reportID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid report ID format"})
 		return
 	}
 
-	// Verify report exists
 	reportsColl := config.DB.Collection("audit_reports")
 	var report models.AuditReport
 	err = reportsColl.FindOne(context.TODO(), bson.M{"_id": reportObjID}).Decode(&report)
@@ -159,7 +142,6 @@ func AddReportFindings(c *gin.Context) {
 		return
 	}
 
-	// Check if findings are submitted as an array
 	var findingsArray []struct {
 		Title          string `json:"title" binding:"required"`
 		Severity       string `json:"severity" binding:"required"`
@@ -168,7 +150,6 @@ func AddReportFindings(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&findingsArray); err != nil {
-		// If not an array, try binding a single finding
 		var singleFinding struct {
 			Title          string `json:"title" binding:"required"`
 			Severity       string `json:"severity" binding:"required"`
@@ -181,7 +162,6 @@ func AddReportFindings(c *gin.Context) {
 			return
 		}
 
-		// Convert single finding to array
 		findingsArray = []struct {
 			Title          string `json:"title" binding:"required"`
 			Severity       string `json:"severity" binding:"required"`
@@ -190,7 +170,6 @@ func AddReportFindings(c *gin.Context) {
 		}{singleFinding}
 	}
 
-	// Validate severity values
 	validSeverities := map[string]bool{
 		"critical": true,
 		"high":     true,
@@ -208,7 +187,6 @@ func AddReportFindings(c *gin.Context) {
 		}
 	}
 
-	// Create findings objects
 	now := time.Now()
 	var findings []interface{}
 
@@ -224,7 +202,6 @@ func AddReportFindings(c *gin.Context) {
 		})
 	}
 
-	// Insert findings into database
 	findingsColl := config.DB.Collection("findings")
 	_, err = findingsColl.InsertMany(context.TODO(), findings)
 	if err != nil {
@@ -232,7 +209,6 @@ func AddReportFindings(c *gin.Context) {
 		return
 	}
 
-	// Update findings count in report
 	currentFindingsCount := report.FindingsCount
 	newFindingsCount := currentFindingsCount + len(findingsArray)
 
@@ -252,7 +228,6 @@ func AddReportFindings(c *gin.Context) {
 		return
 	}
 
-	// Add audit log entry
 	log := models.AuditLog{
 		ContractID: report.ContractID,
 		Event:      "Added Findings",
@@ -271,9 +246,7 @@ func AddReportFindings(c *gin.Context) {
 	})
 }
 
-// UpdateContractStatus updates the status of a contract
 func UpdateContractStatus(c *gin.Context) {
-	// Verify admin is authenticated
 	admin, exists := c.Get("currentAdminUser")
 	if !exists {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Admin authentication error"})
@@ -281,17 +254,14 @@ func UpdateContractStatus(c *gin.Context) {
 	}
 	adminUser := admin.(models.AdminUser)
 
-	// Get contract ID from URL parameter
 	contractID := c.Param("id")
 
-	// Validate contract ID format
 	contractObjID, err := primitive.ObjectIDFromHex(contractID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid contract ID format"})
 		return
 	}
 
-	// Parse request body
 	var req struct {
 		Status string `json:"status" binding:"required"`
 	}
@@ -301,7 +271,6 @@ func UpdateContractStatus(c *gin.Context) {
 		return
 	}
 
-	// Validate status value
 	validStatuses := map[string]bool{
 		"pending":     true,
 		"in_progress": true,
@@ -316,7 +285,6 @@ func UpdateContractStatus(c *gin.Context) {
 		return
 	}
 
-	// Verify contract exists
 	contractsColl := config.DB.Collection("contracts")
 	var contract models.Contract
 	err = contractsColl.FindOne(context.TODO(), bson.M{"_id": contractObjID}).Decode(&contract)
@@ -325,13 +293,11 @@ func UpdateContractStatus(c *gin.Context) {
 		return
 	}
 
-	// Prevent changing completed status back to in_progress
 	if contract.Status == "completed" && req.Status == "in_progress" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot change status from completed to in_progress"})
 		return
 	}
 
-	// Update contract status
 	now := time.Now()
 	_, err = contractsColl.UpdateOne(
 		context.TODO(),
@@ -349,7 +315,6 @@ func UpdateContractStatus(c *gin.Context) {
 		return
 	}
 
-	// Create audit log entry
 	log := models.AuditLog{
 		ContractID: contractID,
 		Event:      "Status Changed to " + req.Status,
@@ -361,7 +326,6 @@ func UpdateContractStatus(c *gin.Context) {
 	logsColl := config.DB.Collection("audit_logs")
 	logsColl.InsertOne(context.TODO(), log)
 
-	// Create user notification for status change
 	if req.Status == "in_progress" || req.Status == "completed" || req.Status == "failed" {
 		notification := models.Notification{
 			UserID:    contract.UserID,

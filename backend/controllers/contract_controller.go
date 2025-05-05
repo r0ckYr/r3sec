@@ -129,6 +129,20 @@ func GetContract(c *gin.Context) {
 		return
 	}
 
+	// Always fetch audit logs
+	auditLogsColl := config.DB.Collection("audit_logs")
+	logsCursor, err := auditLogsColl.Find(
+		context.TODO(),
+		bson.M{"contract_id": contract.ID},
+	)
+
+	var auditLogs []models.AuditLog
+	if err == nil {
+		defer logsCursor.Close(context.TODO())
+		logsCursor.All(context.TODO(), &auditLogs)
+	}
+
+	// Try fetching audit report
 	var auditReport models.AuditReport
 	reportsColl := config.DB.Collection("audit_reports")
 	err = reportsColl.FindOne(
@@ -153,12 +167,15 @@ func GetContract(c *gin.Context) {
 			"contract":     contract,
 			"audit_report": auditReport,
 			"findings":     findings,
+			"audit_logs":   auditLogs,
 		})
-	} else {
-		c.JSON(http.StatusOK, gin.H{
-			"contract": contract,
-		})
+		return
 	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"contract":   contract,
+		"audit_logs": auditLogs,
+	})
 }
 
 func DeleteContract(c *gin.Context) {
@@ -208,33 +225,32 @@ func DeleteContract(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Contract deleted successfully"})
 }
 
-
 func ResubmitContract(c *gin.Context) {
 	user := c.MustGet("currentUser").(models.User)
 	contractID := c.Param("id")
-	
+
 	objID, err := primitive.ObjectIDFromHex(contractID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid contract ID format"})
 		return
 	}
-	
+
 	contractsColl := config.DB.Collection("contracts")
 	var contract models.Contract
 	err = contractsColl.FindOne(
 		context.TODO(),
 		bson.M{
-			"_id": objID,
-			"user_id": user.ID.Hex(),
+			"_id":        objID,
+			"user_id":    user.ID.Hex(),
 			"is_deleted": false,
 		},
 	).Decode(&contract)
-	
+
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Contract not found"})
 		return
 	}
-	
+
 	fiveMinutesAgo := time.Now().Add(-5 * time.Minute)
 	if contract.CreatedAt.Before(fiveMinutesAgo) {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -242,59 +258,73 @@ func ResubmitContract(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	var req struct {
+		Name        string `json:"name"`
+		UploadType  string `json:"upload_type"`
 		UploadURL   string `json:"upload_url"`
 		Description string `json:"description"`
 	}
-	
+
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data"})
 		return
 	}
-	
-	if req.UploadURL == "" && req.Description == "" {
+
+	if req.UploadURL == "" && req.Description == "" && req.Name == "" && req.UploadType == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "At least one field (upload_url or description) must be provided",
+			"error": "At least one field (upload_url, description, name, or upload_type) must be provided",
 		})
 		return
 	}
-	
+
 	updateDoc := bson.M{"updated_at": time.Now()}
-	
+
 	if req.UploadURL != "" {
-		// Validate URL based on upload type
-		if !validateUploadURL(contract.UploadType, req.UploadURL) {
+		if !validateUploadURL(req.UploadType, req.UploadURL) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid URL format for the upload type"})
 			return
 		}
 		updateDoc["upload_url"] = req.UploadURL
 	}
-	
+
 	if req.Description != "" {
 		updateDoc["description"] = req.Description
 	}
-	
+
+	if req.Name != "" {
+		updateDoc["name"] = req.Name
+	}
+
+	if req.UploadType != "" {
+		// Optionally validate allowed upload types
+		if req.UploadType != "zip" && req.UploadType != "github" && req.UploadType != "program_id" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid upload type"})
+			return
+		}
+		updateDoc["upload_type"] = req.UploadType
+	}
+
 	updateDoc["status"] = "pending"
-	
+
 	_, err = contractsColl.UpdateOne(
 		context.TODO(),
 		bson.M{"_id": objID},
 		bson.M{"$set": updateDoc},
 	)
-	
+
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update contract"})
 		return
 	}
-	
+
 	logContract(user.ID.Hex(), contractID, "Resubmitted", "user")
-	
+
 	var updatedContract models.Contract
 	err = contractsColl.FindOne(context.TODO(), bson.M{"_id": objID}).Decode(&updatedContract)
-	
+
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Contract resubmitted successfully",
+		"message":  "Contract resubmitted successfully",
 		"contract": updatedContract,
 	})
 }
