@@ -220,7 +220,7 @@ export default function PrivacyPolicy() {
                     <li>There are outstanding issues, claims, or disputes requiring us to retain the data</li>
                 </ul>
                 
-                <p>To request deletion of your personal information, please contact us at privacy@r3sec.xyz.</p>
+                <p>To request deletion of your personal information, please contact us at support@r3sec.xyz.</p>
             `
         },
         {

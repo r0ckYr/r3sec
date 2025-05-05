@@ -120,8 +120,8 @@ export default function Footer() {
 
                         <div className="flex items-center text-zinc-400 text-sm">
                             <Mail size={16} className="mr-2" />
-                            <a href="mailto:support@r3sec.com" className="hover:text-green-400 transition-colors">
-                                support@r3sec.com
+                            <a href="mailto:support@r3sec.xyz" className="hover:text-green-400 transition-colors">
+                                support@r3sec.xyz
                             </a>
                         </div>
                     </motion.div>

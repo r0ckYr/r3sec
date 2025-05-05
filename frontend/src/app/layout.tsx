@@ -18,12 +18,12 @@ export const metadata: Metadata = {
     title: "R3SEC | Solana Smart Contract Security Audits",
     description:
         "R3SEC is a fast and developer-friendly platform for submitting Solana smart contracts for security audits, tracking audit progress, and downloading reports.",
-    metadataBase: new URL("https://r3sec.com"), // update to your domain
+    metadataBase: new URL("https://r3sec.xyz"), // update to your domain
     openGraph: {
         title: "R3SEC | Solana Smart Contract Security",
         description:
             "Submit Solana programs for security audits and get structured, professional reports from the R3SEC team.",
-        url: "https://r3sec.com",
+        url: "https://r3sec.xyz",
         siteName: "R3SEC",
         images: [
             {
