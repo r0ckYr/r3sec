@@ -283,3 +283,112 @@ func AdminLogin(c *gin.Context) {
 		},
 	})
 }
+
+func ForgotPassword(c *gin.Context) {
+	var req struct {
+		Email string `json:"email" binding:"required,email"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	userColl := config.DB.Collection("users")
+
+	var user models.User
+	err := userColl.FindOne(context.TODO(), bson.M{"email": email}).Decode(&user)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"message": "If your email exists, you will receive a password reset link"})
+		return
+	}
+
+	token, err := utils.GeneratePasswordResetToken(user.ID.Hex(), user.Email)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate reset token"})
+		return
+	}
+
+	err = utils.SendPasswordResetEmail(user.Email, token)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send reset email"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "If your email exists, you will receive a password reset link"})
+}
+
+func ResetPassword(c *gin.Context) {
+	var req struct {
+		Token       string `json:"token" binding:"required"`
+		NewPassword string `json:"new_password" binding:"required,min=8"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	claims := jwt.MapClaims{}
+	token, err := jwt.ParseWithClaims(req.Token, claims, func(token *jwt.Token) (interface{}, error) {
+		return jwtSecret, nil
+	})
+	if err != nil || !token.Valid {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid or expired password reset token"})
+		return
+	}
+
+	userID, ok := claims["id"].(string)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid token data"})
+		return
+	}
+
+	email, ok := claims["email"].(string)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid token data"})
+		return
+	}
+
+	tokenType, ok := claims["type"].(string)
+	if !ok || tokenType != "password_reset" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid token type"})
+		return
+	}
+
+	userColl := config.DB.Collection("users")
+	objID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid user ID format"})
+		return
+	}
+
+	var user models.User
+	err = userColl.FindOne(context.TODO(), bson.M{"_id": objID}).Decode(&user)
+	if err != nil || user.Email != email {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "User not found or email mismatch"})
+		return
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), 10)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		return
+	}
+
+	_, err = userColl.UpdateOne(
+		context.TODO(),
+		bson.M{"_id": objID},
+		bson.M{
+			"$set": bson.M{
+				"password_hash": string(hashedPassword),
+				"updated_at":    time.Now(),
+			},
+		},
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Password updated successfully"})
+}

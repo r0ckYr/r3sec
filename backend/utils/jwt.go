@@ -39,3 +39,14 @@ func GenerateAdminJWT(userID string, email string, role string) (string, error) 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(jwtSecret)
 }
+
+func GeneratePasswordResetToken(userID, email string) (string, error) {
+	claims := jwt.MapClaims{
+		"id":    userID,
+		"email": email,
+		"type":  "password_reset",
+		"exp":   time.Now().Add(5 * time.Minute).Unix(),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(jwtSecret)
+}
