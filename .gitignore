@@ -77,3 +77,16 @@ frontend/.env.*.local
 frontend/.vercel/
 frontend/.vercel
 
+# admin-frontend (ignore if monorepo or fullstack)
+admin-frontend/node_modules/
+admin-frontend/.next/
+admin-frontend/.cache/
+admin-frontend/build/
+admin-frontend/out/
+admin-frontend/package-lock.json
+admin-frontend/yarn.lock
+admin-frontend/.env.local
+admin-frontend/.env.*.local
+admin-frontend/.vercel/
+admin-frontend/.vercel
+

@@ -163,7 +163,7 @@ export default function AdminChatPage() {
             if (!response.ok) {
                 if (response.status === 401) {
                     toast.error("Session expired. Please log in again.");
-                    router.push("/admin/login");
+                    router.push("/");
                     return;
                 }
                 throw new Error(`Failed to fetch contracts: ${response.status}`);
@@ -212,7 +212,7 @@ export default function AdminChatPage() {
             if (!response.ok) {
                 if (response.status === 401) {
                     toast.error("Session expired. Please log in again.");
-                    router.push("/admin/login");
+                    router.push("/");
                     return;
                 }
                 throw new Error(`Failed to fetch messages: ${response.status}`);
@@ -258,7 +258,7 @@ export default function AdminChatPage() {
             if (!response.ok) {
                 if (response.status === 401) {
                     toast.error("Session expired. Please log in again.");
-                    router.push("/admin/login");
+                    router.push("/");
                     return;
                 }
                 throw new Error(`Failed to send message: ${response.status}`);
@@ -483,7 +483,7 @@ export default function AdminChatPage() {
                                 </div>
                             )}
                             <button
-                                onClick={() => router.push(`/admin/contracts?id=${selectedContract.id}`)}
+                                onClick={() => router.push(`/contracts?id=${selectedContract.id}`)}
                                 className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-500 transition-colors"
                             >
                                 View Contract

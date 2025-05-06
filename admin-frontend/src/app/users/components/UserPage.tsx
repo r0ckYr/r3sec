@@ -72,7 +72,7 @@ export default function AdminUsers() {
         // Check for authentication
         const authToken = localStorage.getItem("adminAuthToken");
         if (!authToken) {
-            router.push("/admin/login");
+            router.push("/");
             return;
         }
 
@@ -116,7 +116,7 @@ export default function AdminUsers() {
             if (!response.ok) {
                 if (response.status === 401) {
                     toast.error("Session expired. Please log in again.");
-                    router.push("/admin/login");
+                    router.push("/");
                     return;
                 }
                 throw new Error(`Failed to fetch users: ${response.status}`);
