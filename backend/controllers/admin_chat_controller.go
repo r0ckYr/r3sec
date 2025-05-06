@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -223,4 +224,75 @@ func createUserNotification(userID, title, body string) {
 
 	notificationsColl := config.DB.Collection("notifications")
 	notificationsColl.InsertOne(context.TODO(), notification)
+}
+
+func AdminGetUnreadMessagesSummary(c *gin.Context) {
+	contractsColl := config.DB.Collection("contracts")
+	messagesColl := config.DB.Collection("messages")
+
+	// Parse pagination params
+	limit := 20
+	skip := 0
+
+	if l := c.Query("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+	if s := c.Query("skip"); s != "" {
+		if parsed, err := strconv.Atoi(s); err == nil && parsed >= 0 {
+			skip = parsed
+		}
+	}
+
+	// Optional filters
+	filter := bson.M{"is_deleted": false}
+	if name := c.Query("name"); name != "" {
+		filter["name"] = bson.M{"$regex": name, "$options": "i"}
+	}
+
+	findOptions := options.Find().SetLimit(int64(limit)).SetSkip(int64(skip))
+
+	// Fetch contracts
+	cursor, err := contractsColl.Find(context.TODO(), filter, findOptions)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch contracts"})
+		return
+	}
+	defer cursor.Close(context.TODO())
+
+	var contracts []models.Contract
+	if err = cursor.All(context.TODO(), &contracts); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode contracts"})
+		return
+	}
+
+	var response []gin.H
+
+	for _, contract := range contracts {
+		count, err := messagesColl.CountDocuments(context.TODO(), bson.M{
+			"contract_id": contract.ID,
+			"sender_role": "user",
+			"is_read":     false,
+		})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count messages"})
+			return
+		}
+
+		response = append(response, gin.H{
+			"contract_id":   contract.ID,
+			"contract_name": contract.Name,
+			"has_unread":    count > 0,
+			"unread_count":  count,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"contracts": response,
+		"pagination": gin.H{
+			"limit": limit,
+			"skip":  skip,
+		},
+	})
 }

@@ -5,6 +5,7 @@ import (
 	"context"
 	"net/http"
 	"strconv"
+    "sort"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
@@ -25,6 +26,9 @@ func AdminListContracts(c *gin.Context) {
 	}
 	status := c.Query("status")
 	userID := c.Query("user_id")
+	searchTerm := c.Query("search")
+	sortBy := c.Query("sort")
+	sortOrder := c.Query("order")
 
 	// Build query filter
 	filter := bson.M{}
@@ -37,6 +41,26 @@ func AdminListContracts(c *gin.Context) {
 	// Add user filter if provided
 	if userID != "" {
 		filter["user_id"] = userID
+	}
+
+	// Add search term filter if provided
+	if searchTerm != "" {
+		// Create a text search filter that checks multiple fields
+		searchFilter := bson.M{
+			"$or": []bson.M{
+				{"name": bson.M{"$regex": searchTerm, "$options": "i"}},
+				{"description": bson.M{"$regex": searchTerm, "$options": "i"}},
+				{"repository": bson.M{"$regex": searchTerm, "$options": "i"}},
+				{"contract_address": bson.M{"$regex": searchTerm, "$options": "i"}},
+			},
+		}
+		
+		// Combine with existing filter
+		if len(filter) > 0 {
+			filter = bson.M{"$and": []bson.M{filter, searchFilter}}
+		} else {
+			filter = searchFilter
+		}
 	}
 
 	page := 1
@@ -54,8 +78,27 @@ func AdminListContracts(c *gin.Context) {
 		}
 	}
 
+	// Configure sort options
+	sortDirection := -1 // Default to descending (newest first)
+	if sortOrder == "asc" {
+		sortDirection = 1
+	}
+
+	sortField := "created_at" // Default sort field
+	if sortBy != "" {
+		switch sortBy {
+		case "name", "status", "created_at", "updated_at":
+			sortField = sortBy
+		case "user_email": 
+			// Handle special case for user_email, since it's not directly in contracts collection
+			// In this case, we'll keep the default sort by created_at
+			// The actual sorting by user_email would need to be done after fetching the data
+			sortField = "created_at"
+		}
+	}
+
 	opts := options.Find()
-	opts.SetSort(bson.M{"created_at": -1}) // Sort by creation date, newest first
+	opts.SetSort(bson.M{sortField: sortDirection})
 	opts.SetSkip(int64((page - 1) * limit))
 	opts.SetLimit(int64(limit))
 
@@ -103,6 +146,18 @@ func AdminListContracts(c *gin.Context) {
 			"user_email": user.Email,
 			"has_report": hasReport,
 			"report_id":  auditReport.ID,
+		})
+	}
+
+	// Special case: If sorting by user_email, we need to sort the slice after fetching
+	if sortBy == "user_email" {
+		sort.Slice(contractsWithUser, func(i, j int) bool {
+			email1 := contractsWithUser[i]["user_email"].(string)
+			email2 := contractsWithUser[j]["user_email"].(string)
+			if sortOrder == "asc" {
+				return email1 < email2
+			}
+			return email1 > email2
 		})
 	}
 
