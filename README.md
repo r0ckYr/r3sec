@@ -2,7 +2,7 @@
 
 **R3SEC** is a security-first platform for auditing **Solana smart contracts**, designed to help developers, DAOs, and projects securely submit their programs, track audit progress, and download structured security reports.
 
-![R3SEC Banner](./public/og-image.png)
+![R3SEC Banner](./og-image.png)
 
 ---
 
