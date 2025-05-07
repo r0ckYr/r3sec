@@ -49,39 +49,60 @@ func ListContracts(c *gin.Context) {
 
 func CreateContract(c *gin.Context) {
 	user := c.MustGet("currentUser").(models.User)
-
 	var req struct {
 		Name        string `json:"name" binding:"required"`
 		UploadType  string `json:"upload_type" binding:"required"`
 		Description string `json:"description"`
 		UploadURL   string `json:"upload_url" binding:"required"`
+		PaymentID   string `json:"payment_id"`
 	}
-
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data"})
 		return
 	}
-
 	if !isValidUploadType(req.UploadType) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid upload type"})
 		return
 	}
-
 	if !validateUploadURL(req.UploadType, req.UploadURL) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid URL or contract address format"})
 		return
 	}
 
+	// Default payment values
+	planID := ""
+	paymentStatus := "no_payment"
+
+	// Check if payment ID exists and is valid
+	if req.PaymentID != "" {
+		// Try to convert the string to ObjectID to check validity
+		paymentObjID, err := primitive.ObjectIDFromHex(req.PaymentID)
+		if err == nil {
+			// Valid ObjectID, fetch payment details
+			paymentsColl := config.DB.Collection("payments")
+			var payment models.Payment
+			err = paymentsColl.FindOne(context.TODO(), bson.M{"_id": paymentObjID}).Decode(&payment)
+			if err == nil {
+				// Set payment details if found
+				planID = payment.PlanID
+				paymentStatus = payment.Status
+			}
+		}
+	}
+
 	contract := models.Contract{
-		UserID:      user.ID.Hex(),
-		Name:        req.Name,
-		Description: req.Description,
-		UploadType:  req.UploadType,
-		UploadURL:   req.UploadURL,
-		Status:      "pending",
-		IsDeleted:   false,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+		UserID:        user.ID.Hex(),
+		Name:          req.Name,
+		Description:   req.Description,
+		UploadType:    req.UploadType,
+		UploadURL:     req.UploadURL,
+		Status:        "pending",
+		PaymentID:     req.PaymentID,
+		PlanID:        planID,
+		PaymentStatus: paymentStatus,
+		IsDeleted:     false,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
 	}
 
 	contractsColl := config.DB.Collection("contracts")
@@ -90,13 +111,11 @@ func CreateContract(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create contract"})
 		return
 	}
-
 	if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
 		contract.ID = oid.Hex()
 	}
 
 	logContract(user.ID.Hex(), contract.ID, "Uploaded", "user")
-
 	c.JSON(http.StatusCreated, gin.H{
 		"message":  "Contract created successfully",
 		"contract": contract,
@@ -280,8 +299,21 @@ func ResubmitContract(c *gin.Context) {
 
 	updateDoc := bson.M{"updated_at": time.Now()}
 
+	// Handle upload type validation first
+	uploadType := contract.UploadType
+	if req.UploadType != "" {
+		// Use the same validation function as in CreateContract
+		if !isValidUploadType(req.UploadType) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid upload type"})
+			return
+		}
+		uploadType = req.UploadType
+		updateDoc["upload_type"] = req.UploadType
+	}
+
+	// Now validate upload URL if provided
 	if req.UploadURL != "" {
-		if !validateUploadURL(req.UploadType, req.UploadURL) {
+		if !validateUploadURL(uploadType, req.UploadURL) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid URL format for the upload type"})
 			return
 		}
@@ -294,15 +326,6 @@ func ResubmitContract(c *gin.Context) {
 
 	if req.Name != "" {
 		updateDoc["name"] = req.Name
-	}
-
-	if req.UploadType != "" {
-		// Optionally validate allowed upload types
-		if req.UploadType != "zip" && req.UploadType != "github" && req.UploadType != "program_id" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid upload type"})
-			return
-		}
-		updateDoc["upload_type"] = req.UploadType
 	}
 
 	updateDoc["status"] = "pending"

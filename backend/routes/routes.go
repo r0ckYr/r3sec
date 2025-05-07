@@ -17,5 +17,6 @@ func SetupRoutes(r *gin.Engine) {
 		NotificationRoutes(api)
 		AdminRoutes(api)
 		ChatRoutes(api)
+        PaymentRoutes(api)
 	}
 }
